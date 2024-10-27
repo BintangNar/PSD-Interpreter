@@ -8,11 +8,16 @@ class errors:
         self.details = details
     
     def as_string(self):
-        return f'{self.error_name}: {self.details}'
+        result = f'{self.error_name}: {self.details}\n'
+        return f'result'
 
 class illegalChar(errors):
     def __init__(self, details):
         super().__init__('Illegal Character Detected', details)
+
+class InvalidSyntax(errors):
+    def __init__(self, details):
+        super().__init__('Invalid syntax Detected', details)
 
 # TOKENS
 TT_INT = 'TT_INT'
@@ -34,7 +39,8 @@ class token:
 
 # LEXER
 class lexer:
-    def __init__(self, text):
+    def __init__(self, fn, text):
+        self.fn = fn
         self.text = text
         self.pos = -1
         self.current_char = None
@@ -88,15 +94,114 @@ class lexer:
                 num_str += self.current_char
             self.advance()
         
-        
         if dot_count == 0:
             return token(TT_INT, int(num_str))
         else:
             return token(TT_FLOAT, float(num_str))
-            
+
+########################        
+# PARSER
+########################
+#NODES
+class NumberNode:
+    def __init__(self, tok):
+        self.tok = tok
+    def __repr__(self):
+        return f'{self.tok}'
+
+class BinOpNode:
+    def __init__(self, left_node, op_tok, right_node):
+        self.left_node = left_node
+        self.op_tok = op_tok
+        self.right_node = right_node
+    
+    def __repr__(self):
+        return f'({self.left_node},{self.op_tok},{self.right_node})'
+
+# PARSER
+class Parser:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.tok_idx = -1
+        self.current_tok = None
+        self.advance()
+    
+    def advance(self):
+        self.tok_idx += 1
+        if self.tok_idx < len(self.tokens):
+            self.current_tok = self.tokens[self.tok_idx]
+        return self.current_tok
+    
+    def parse(self):
+        return self.expr()
+
+    def factor(self):
+        tok = self.current_tok
+
+        if tok.type in (TT_INT, TT_FLOAT):
+            self.advance()
+            return NumberNode(tok)
+
+    def term(self):
+        return self.bin_op(self.factor, (TT_MUL, TT_DIV, TT_MOD))
+
+    def expr(self):
+        return self.bin_op(self.term, (TT_PLUS, TT_MINUS))
+        
+    def bin_op(self, func, ops):
+        left = func()
+
+        while self.current_tok is not None and self.current_tok.type in ops:
+            op_tok = self.current_tok
+            self.advance()
+            right = func()
+            left = BinOpNode(left, op_tok, right)
+        return left
+    
+#####################
+#INTERPRETER            
+#####################
+class interpreter:
+    def visit(self,node):
+        method_name = f'visit_{type(node).__name__}'
+        method = getattr(self, method_name, self.no_visit_method)
+        return method(node)
+    
+    def no_visit_method(self,node):
+        raise Exception(f'No Visit_{type(node).__name__}method defined')
+    
+    def visit_NumberNode(self,node):
+        return node.tok.value
+    
+    def visit_BinOpNode(self,node):
+        left = self.visit(node.left_node)
+        right = self.visit(node.right_node)
+
+        if node.op_tok.type == TT_PLUS:
+            return left + right
+        elif node.op_tok.type == TT_MINUS:
+            return left - right
+        elif node.op_tok.type == TT_MUL:
+            return left * right
+        elif node.op_tok.type == TT_DIV:
+            if right == 0:
+                raise Exception("Division by 0 is not available")
+            return left / right
+        elif node.op_tok.type == TT_MOD:
+            return left % right
+    
+
 # Program Run
 def run(text):
-    lex = lexer(text)  
+    lex = lexer('<stdin>', text) 
     tokens, error = lex.tokenCreate()
+    if error: return None, error
 
-    return tokens, error
+    # AST
+    parser = Parser(tokens)
+    ast = parser.parse()
+    
+    #interpreter
+    Interpreter = interpreter()
+    result = Interpreter.visit(ast)
+    return result,None
