@@ -1,5 +1,7 @@
 # CONSTANTS
 DIGITS = '0123456789'
+# LETTERS = string.ascii_letters
+# LETTERS_DIGITS = LETTERS + DIGITS
 
 # ERROR
 class errors:
@@ -8,8 +10,7 @@ class errors:
         self.details = details
     
     def as_string(self):
-        result = f'{self.error_name}: {self.details}\n'
-        return f'result'
+        return f'{self.error_name}: {self.details}\n'
 
 class illegalChar(errors):
     def __init__(self, details):
@@ -27,6 +28,8 @@ TT_MINUS = 'MINUS'
 TT_MUL = 'MUL'
 TT_DIV = 'DIV'
 TT_MOD = 'MOD'
+TT_NEWLINE = 'NEWLINE'
+TT_EOF = 'EOF'
 
 class token:
     def __init__(self, type_, value=None):
@@ -56,6 +59,9 @@ class lexer:
         while self.current_char is not None:
             if self.current_char in ' \t':
                 self.advance()
+            elif self.current_char == '\n':
+                tokens.append(token('NEWLINE'))
+                self.advance()
             elif self.current_char == '+':
                 tokens.append(token(TT_PLUS))
                 self.advance()
@@ -77,7 +83,8 @@ class lexer:
                 char = self.current_char
                 self.advance()
                 return [], illegalChar("'" + char + "' is not listed")
-            
+        
+        tokens.append(token('EOF'))    
         return tokens, None
     
     def make_number(self):
@@ -132,8 +139,19 @@ class Parser:
             self.current_tok = self.tokens[self.tok_idx]
         return self.current_tok
     
+    def parse_statement(self):
+        statements = []
+        while self.current_tok.type != 'EOF':
+            if self.current_tok.type == 'NEWLINE':
+               self.advance()
+            else:
+               statements.append(self.expr())
+               if self.current_tok.type == 'NEWLINE':
+                   self.advance()
+        return statements
+
     def parse(self):
-        return self.expr()
+        return self.parse_statement()
 
     def factor(self):
         tok = self.current_tok
@@ -195,13 +213,18 @@ class interpreter:
 def run(text):
     lex = lexer('<stdin>', text) 
     tokens, error = lex.tokenCreate()
-    if error: return None, error
+    if error: 
+        print(error.as_string())
+        return None, error
 
-    # AST
+    # Parse multiple statements
     parser = Parser(tokens)
-    ast = parser.parse()
+    statements = parser.parse()
     
-    #interpreter
+    # Interpret each statement
     Interpreter = interpreter()
-    result = Interpreter.visit(ast)
-    return result,None
+    for statement in statements:
+        if statement:
+            result = Interpreter.visit(statement)
+            print(result)
+    return None,None
