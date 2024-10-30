@@ -30,6 +30,8 @@ TT_DIV = 'DIV'
 TT_MOD = 'MOD'
 TT_NEWLINE = 'NEWLINE'
 TT_EOF = 'EOF'
+TT_PRINT = 'PRINT'
+TT_STRING = 'STRING'
 TT_CONVERTBINARY = 'CONVERTBINARY'
 TT_CONVERTOCTAN = 'CONVERTOCTAN'
 TT_CONVERTHEXADEC = 'CONVERTHEXADEC'
@@ -52,9 +54,10 @@ class lexer:
         self.pos = -1
         self.current_char = None
         self.keywords = {
-            "BINARY": TT_CONVERTBINARY,
-            "OCTAL": TT_CONVERTOCTAN,
-            "HEXADEC": TT_CONVERTHEXADEC,
+            "binaire": TT_CONVERTBINARY,
+            "octale": TT_CONVERTOCTAN,
+            "hexadecimale": TT_CONVERTHEXADEC,
+            "imprimer": TT_PRINT,
             # Add more keywords as needed
         }
         self.advance()
@@ -88,12 +91,13 @@ class lexer:
                 tokens.append(token(TT_MOD))
                 self.advance()
             elif self.current_char.isalpha():
-                # Start forming an identifier or keyword
                 keyword_str = self.make_identifier()
                 if keyword_str in self.keywords:
-                    tokens.append(token(self.keywords[keyword_str]))  # Removed pos_start
+                    tokens.append(token(self.keywords[keyword_str]))  
                 else:
-                    tokens.append(token(TT_IDENTIFIER, keyword_str))  # Removed pos_start
+                    tokens.append(token(TT_IDENTIFIER, keyword_str))
+            elif self.current_char == '"':
+                tokens.append(self.make_string())  
             elif self.current_char in DIGITS:
                 tokens.append(self.make_number())
             else:
@@ -110,6 +114,17 @@ class lexer:
             identifier_str += self.current_char
             self.advance()
         return identifier_str
+    
+    def make_string(self):
+        string_value = ''
+        quote_type = self.current_char
+        self.advance()
+
+        while self.current_char is not None and self.current_char != quote_type:
+            string_value += self.current_char
+            self.advance()
+        self.advance()
+        return token(TT_STRING, string_value)
     
     def make_number(self):
         num_str = ''
@@ -149,6 +164,16 @@ class BinOpNode:
     def __repr__(self):
         return f'({self.left_node},{self.op_tok},{self.right_node})'
 
+class PrintNode:
+    def __init__(self,value_node):
+        self.value_node = value_node
+
+class StringNode:
+    def __init__(self,tok):
+        self.tok = tok
+    def __repr__(self):
+        return f'{self.tok}'
+
 # PARSER
 class Parser:
     def __init__(self, tokens):
@@ -168,6 +193,9 @@ class Parser:
         while self.current_tok.type != 'EOF':
             if self.current_tok.type == 'NEWLINE':
                self.advance()
+            elif self.current_tok.type == TT_PRINT:
+                self.advance()
+                statements.append(PrintNode(self.expr()))
             else:
                statements.append(self.expr())
                if self.current_tok.type == 'NEWLINE':
@@ -197,6 +225,10 @@ class Parser:
             self.advance()
             node = self.factor()
             return ConversionNode(tok, node, base=16)
+        
+        elif tok.type == TT_STRING:
+            self.advance()
+            return StringNode(tok)
 
     def term(self):
         return self.bin_op(self.factor, (TT_MUL, TT_DIV, TT_MOD))
@@ -266,14 +298,23 @@ class interpreter:
         else:
             raise ValueError(f"Unknown base: {node.base}")
     
+    def visit_StringNode(self,node):
+        return node.tok.value
+    
+    def visit_PrintNode(self,node):
+        value = self.visit(node.value_node)
+        print(value)
+        return value
 
+# Program Run
+# Program Run
 # Program Run
 def run(text):
     lex = lexer('<stdin>', text) 
     tokens, error = lex.tokenCreate()
     if error: 
         print(error.as_string())
-        return None, error
+        return None, error  # Explicitly return error tuple if there's a lexer error
 
     # Parse multiple statements
     parser = Parser(tokens)
@@ -283,6 +324,6 @@ def run(text):
     Interpreter = interpreter()
     for statement in statements:
         if statement:
-            result = Interpreter.visit(statement)
-            print(result)
-    return None,None
+            Interpreter.visit(statement)  # Removed extra print
+            
+    return None, None  # Consistent return of tuple

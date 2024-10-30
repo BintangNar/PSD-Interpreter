@@ -1,12 +1,5 @@
-1+1
-5%2
-11-5+2
-5 * 4 - 2
-
-BINARY 10
-OCTAL 10
-HEXADEC 10
-
-BINARY 15
-OCTAL 15
-HEXADEC 15
+imprimer "Konversi Bilangan"
+imprimer "HAYOOOO"
+imprimer "strukdat strukdat strukdat strukdat"
+imprimer 10+10
+imprimer binaire 10
