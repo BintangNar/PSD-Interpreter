@@ -30,6 +30,10 @@ TT_DIV = 'DIV'
 TT_MOD = 'MOD'
 TT_NEWLINE = 'NEWLINE'
 TT_EOF = 'EOF'
+TT_CONVERTBINARY = 'CONVERTBINARY'
+TT_CONVERTOCTAN = 'CONVERTOCTAN'
+TT_CONVERTHEXADEC = 'CONVERTHEXADEC'
+TT_IDENTIFIER = 'IDENTIFIER'
 
 class token:
     def __init__(self, type_, value=None):
@@ -47,6 +51,12 @@ class lexer:
         self.text = text
         self.pos = -1
         self.current_char = None
+        self.keywords = {
+            "BINARY": TT_CONVERTBINARY,
+            "OCTAL": TT_CONVERTOCTAN,
+            "HEXADEC": TT_CONVERTHEXADEC,
+            # Add more keywords as needed
+        }
         self.advance()
     
     def advance(self):
@@ -77,6 +87,13 @@ class lexer:
             elif self.current_char == '%':
                 tokens.append(token(TT_MOD))
                 self.advance()
+            elif self.current_char.isalpha():
+                # Start forming an identifier or keyword
+                keyword_str = self.make_identifier()
+                if keyword_str in self.keywords:
+                    tokens.append(token(self.keywords[keyword_str]))  # Removed pos_start
+                else:
+                    tokens.append(token(TT_IDENTIFIER, keyword_str))  # Removed pos_start
             elif self.current_char in DIGITS:
                 tokens.append(self.make_number())
             else:
@@ -86,6 +103,13 @@ class lexer:
         
         tokens.append(token('EOF'))    
         return tokens, None
+    
+    def make_identifier(self):
+        identifier_str = ''
+        while self.current_char is not None and (self.current_char.isalnum() or self.current_char == '_'):
+            identifier_str += self.current_char
+            self.advance()
+        return identifier_str
     
     def make_number(self):
         num_str = ''
@@ -159,6 +183,20 @@ class Parser:
         if tok.type in (TT_INT, TT_FLOAT):
             self.advance()
             return NumberNode(tok)
+        if tok.type == TT_CONVERTBINARY:
+            self.advance()
+            node = self.factor()
+            return ConversionNode(tok, node, base=2)
+
+        elif tok.type == TT_CONVERTOCTAN:
+            self.advance()
+            node = self.factor()
+            return ConversionNode(tok, node, base=8)
+
+        elif tok.type == TT_CONVERTHEXADEC:
+            self.advance()
+            node = self.factor()
+            return ConversionNode(tok, node, base=16)
 
     def term(self):
         return self.bin_op(self.factor, (TT_MUL, TT_DIV, TT_MOD))
@@ -175,6 +213,14 @@ class Parser:
             right = func()
             left = BinOpNode(left, op_tok, right)
         return left
+
+#CONVERT
+class ConversionNode:
+    def __init__(self, token, number_node, base):
+        self.token = token
+        self.number_node = number_node
+        self.base = base
+
     
 #####################
 #INTERPRETER            
@@ -207,6 +253,18 @@ class interpreter:
             return left / right
         elif node.op_tok.type == TT_MOD:
             return left % right
+        
+    def visit_ConversionNode(self, node):
+        number = self.visit(node.number_node)  # Get the number to convert
+
+        if node.base == 2:
+            return bin(int(number))[2:]  # Convert to binary without '0b' prefix
+        elif node.base == 8:
+            return oct(int(number))[2:]  # Convert to octal without '0o' prefix
+        elif node.base == 16:
+            return hex(int(number))[2:]  # Convert to hexadecimal without '0x' prefix
+        else:
+            raise ValueError(f"Unknown base: {node.base}")
     
 
 # Program Run

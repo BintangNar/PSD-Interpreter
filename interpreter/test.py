@@ -1,15 +1,26 @@
-import argparse
-import interpreter  # Import your interpreter
+import sys
+from interpreter import run  # Import the run function from your interpreter module
 
 def interpret_file(filename):
-    with open(filename, 'r') as file:
-        text = file.read()
-    interpreter.run(text)  # Call the run function directly
+    try:
+        with open(filename, 'r') as file:
+            text = file.read()
+    except FileNotFoundError:
+        print(f"Error: File '{filename}' not found.")
+        return
+    except IOError as e:
+        print(f"Error: Unable to read '{filename}': {e}")
+        return
+
+    result, error = run(text)  # Pass only `text` if `run()` takes one argument
+    if error:
+        print(error.as_string())
+    else:
+        print(result)
 
 if __name__ == "__main__":
-    # Set up argument parsing
-    parser = argparse.ArgumentParser(description='Run a code file with the interpreter.')
-    parser.add_argument('filename', type=str, help='The path to the code file to interpret (e.g., code.oyy)')
-
-    args = parser.parse_args()  # Parse the command-line arguments
-    interpret_file(args.filename)  # Pass the specified filename to interpret_file
+    if len(sys.argv) < 2:
+        print("Usage: python test.py <filename>")
+    else:
+        filename = sys.argv[1]
+        interpret_file(filename)
